@@ -11,7 +11,7 @@ my $ua = LWP::UserAgent->new;
 ### start of config section
 
 # if you don't want to store your credentials within this script just keep the
-# following three dummy values and set $ask_auth = 1
+# following two dummy values and set $ask_auth = 1
 
 # the following credentials are needed for remote login, e.g. from WAN/Internet
 my $remote_user = "myusername";
