@@ -17,9 +17,6 @@ my $ua = LWP::UserAgent->new;
 my $remote_user = "myusername";
 my $remote_pass = "myPassword!";
 
-# local fritzbox admin password
-my $local_admin_pass = "myAdminPassword!";
-
 # enable interactive authentication to avoid storing credentials in this script
 my $ask_auth = 0;
 
@@ -50,7 +47,6 @@ sub readcreds() {
 	print "remote login username: "; chomp($remote_user = ReadLine(0));
 	ReadMode('noecho');
 	print "remote login password: "; chomp($remote_pass = ReadLine(0));
-	print "\nlocal admin password: "; chomp($local_admin_pass = ReadLine(0));
 	ReadMode('restore');
 	print "\n\n";
 }
