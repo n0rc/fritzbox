@@ -10,12 +10,15 @@ my $ua = LWP::UserAgent->new;
 
 ### start of config section
 
-# if you don't want to store your credentials within this script just keep the
-# following two dummy values and set $ask_auth = 1
+# if you don't want to store your credentials within this script just
+# keep the next three dummy values and set $ask_auth = 1
 
 # the following credentials are needed for remote login, e.g. from WAN/Internet
 my $remote_user = "myusername";
 my $remote_pass = "myPassword!";
+
+# local admin password required for some fritzboxes 
+my $local_admin_pass = "myAdminPassword!";
 
 # enable interactive authentication to avoid storing credentials in this script
 my $ask_auth = 0;
@@ -43,12 +46,13 @@ sub err_exit($) {
 }
 
 sub readcreds() {
-	use Term::ReadKey;
-	print "remote login username: "; chomp($remote_user = ReadLine(0));
-	ReadMode('noecho');
-	print "remote login password: "; chomp($remote_pass = ReadLine(0));
-	ReadMode('restore');
-	print "\n\n";
+    use Term::ReadKey;
+    print "remote login username: "; chomp($remote_user = ReadLine(0));
+    ReadMode('noecho');
+    print "remote login password: "; chomp($remote_pass = ReadLine(0));
+    print "\nlocal admin password: "; chomp($local_admin_pass = ReadLine(0));
+    ReadMode('restore');
+    print "\n\n";
 }
 
 readcreds if ($ask_auth);
@@ -63,32 +67,34 @@ my $url_wakeup = $url_base."/cgi-bin/webcm";
 
 my $r = $ua->get($url_login);
 if ($r->is_success) {
-	my $c = $r->decoded_content;
-	if ($c =~ m#(?:g_challenge|var challenge|\["security:status/challenge"\]) = "([a-f0-9]+)"#) {
-		my $challenge = $1;
-		my %data = (
-			username => $remote_user,
-			response => sprintf "%s-%s", $challenge, md5_hex(encode("UTF16-LE", sprintf "%s-%s", $challenge, $remote_pass))			
-		);
-		$r = $ua->post($url_login, \%data);
-		$c = $r->decoded_content;
-		if ($c =~ m#(?:home|logout)\.lua\?sid=([a-f0-9]+)#) {
-			my $sid = $1;
-			%data = (sid => $sid, "wakeup:settings/mac" => $mac);
-			$r = $ua->post($url_wakeup, \%data);
-			if ($r->is_success) {
-				print "[success] wakeup done\n";
-			} else {
-				err_exit $r->status_line;
-			}
-		} else {
-			err_exit "could not find a session id";
-		}
-	} else {
-		err_exit "could not find a challenge";
-	}
+    my $c = $r->decoded_content;
+    if ($c =~ m#(?:g_challenge|var challenge|\["security:status/challenge"\]) = "([a-f0-9]+)"#) {
+        my $challenge = $1;
+        my $pass = ($c =~ m#Benutzername#) ? $remote_pass : $local_admin_pass;
+        my %data = (
+            username => $remote_user,
+            response => sprintf "%s-%s", $challenge, md5_hex(encode("UTF16-LE", sprintf "%s-%s", $challenge, $pass))
+        );
+        $r = $ua->post($url_login, \%data);
+        $c = $r->decoded_content;
+        err_exit "login failed" if ($c =~ m#(?:error_text|ErrorMsg)#i);
+        if ($c =~ m#(?:home|logout)\.lua\?sid=([a-f0-9]+)#) {
+            my $sid = $1;
+            %data = (sid => $sid, "wakeup:settings/mac" => $mac);
+            $r = $ua->post($url_wakeup, \%data);
+            if ($r->is_success) {
+                print "[success] wakeup done\n";
+            } else {
+                err_exit $r->status_line;
+            }
+        } else {
+            err_exit "could not find a session id";
+        }
+    } else {
+        err_exit "could not find a challenge";
+    }
 } else {
-	err_exit "could not login: " . $r->status_line;
+    err_exit "could not load login page: " . $r->status_line;
 }
 
 exit 0;
