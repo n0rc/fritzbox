@@ -33,8 +33,8 @@ my $port = 443;
 # use mac format 01:23:45:67:89:AB
 my $mac = "00:CO:1D:CO:FF:EE";
 
-# uncomment the following line if you get ssl certificate warnings
-#$ua->ssl_opts(verify_hostname => 0);
+# uncomment the following line to disable ssl certificate verification
+#$ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
 
 ### end of config section
 ### do not change anything below!
