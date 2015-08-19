@@ -14,11 +14,11 @@ my $ua = LWP::UserAgent->new;
 # keep the next three dummy values and set $ask_auth = 1
 
 # the following credentials are needed for remote login, e.g. from WAN/Internet
-my $remote_user = "myusername";
-my $remote_pass = "myPassword!";
+my $remote_user = "myUsername";
+my $remote_pass = "myPassword";
 
 # local admin password required for some fritzboxes 
-my $local_admin_pass = "myAdminPassword!";
+my $local_admin_pass = "myAdminPassword";
 
 # enable interactive authentication to avoid storing credentials in this script
 my $ask_auth = 0;
@@ -59,11 +59,13 @@ readcreds if ($ask_auth);
 
 $ua->timeout(30);
 push @{$ua->requests_redirectable}, 'POST';
-$ua->credentials($host.":".$port, "HTTPS Access", $remote_user, $remote_pass);
+$ua->credentials("$host:$port", "HTTPS Access", $remote_user, $remote_pass);
 
-my $url_base = "https://".$host;
-my $url_login = $url_base."/login.lua";
-my $url_wakeup = $url_base."/cgi-bin/webcm";
+my $url_base = "https://$host:$port";
+my $url_login = "$url_base/login.lua";
+my $url_netdevs = "$url_base/net/network_user_devices.lua?sid=";
+my $url_wakeup = "$url_base/net/edit_device.lua?sid=";
+my $url_wakeup_old = "$url_base/cgi-bin/webcm";
 
 my $r = $ua->get($url_login);
 if ($r->is_success) {
@@ -75,17 +77,38 @@ if ($r->is_success) {
             username => $remote_user,
             response => sprintf "%s-%s", $challenge, md5_hex(encode("UTF16-LE", sprintf "%s-%s", $challenge, $pass))
         );
+        my $vers = 0;
         $r = $ua->post($url_login, \%data);
         $c = $r->decoded_content;
+        if ($c =~ m#FRITZ!OS (\d+)\.(\d+)#) {
+            $vers = $1.$2;
+        }
         err_exit "login failed" if ($c =~ m#(?:error_text|ErrorMsg)#i);
         if ($c =~ m#(?:home|logout)\.lua\?sid=([a-f0-9]+)#) {
             my $sid = $1;
-            %data = (sid => $sid, "wakeup:settings/mac" => $mac);
-            $r = $ua->post($url_wakeup, \%data);
-            if ($r->is_success) {
-                print "[success] wakeup done\n";
+            if ($vers < 630) {
+                %data = (sid => $sid, "wakeup:settings/mac" => $mac);
+                $r = $ua->post($url_wakeup_old, \%data);
+                if ($r->is_success) {
+                    print "[success] wakeup done\n";
+                } else {
+                    err_exit "invalid post data" . $r->status_line;
+                }
             } else {
-                err_exit $r->status_line;
+                $r = $ua->get($url_netdevs.$sid);
+                $c = $r->decoded_content;
+                if ($c =~ m#$mac.*? value="([^"]+)"#i) {
+                    my $dev = $1;
+                    %data = (dev => $dev, btn_wake => "");
+                    $r = $ua->post($url_wakeup.$sid, \%data);
+                    if ($r->is_success) {
+                        print "[success] wakeup done\n";
+                    } else {
+                        err_exit "invalid post data" . $r->status_line;
+                    }
+                } else {
+                    err_exit "could not find mac";
+                }
             }
         } else {
             err_exit "could not find a session id";
