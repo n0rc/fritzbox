@@ -5,6 +5,7 @@ use warnings;
 use LWP::UserAgent;
 use Encode;
 use Digest::MD5 qw(md5_hex);
+use JSON;
 
 my $ua = LWP::UserAgent->new;
 
@@ -62,15 +63,18 @@ push @{$ua->requests_redirectable}, 'POST';
 $ua->credentials("$host:$port", "HTTPS Access", $remote_user, $remote_pass);
 
 my $url_base = "https://$host:$port";
-my $url_login = "$url_base/login.lua";
+my $url_login_suffix = "/login.lua";
+my $url_login = $url_base.$url_login_suffix;
 my $url_netdevs = "$url_base/net/network_user_devices.lua?sid=";
-my $url_wakeup = "$url_base/net/edit_device.lua?sid=";
+my $url_editdev_suffix = "net/edit_device.lua";
+my $url_wakeup = "$url_base/$url_editdev_suffix?sid=";
 my $url_wakeup_old = "$url_base/cgi-bin/webcm";
+my $url_data = "$url_base/data.lua";
 
 my $r = $ua->get($url_login);
 if ($r->is_success) {
     my $c = $r->decoded_content;
-    if ($c =~ m#(?:g_challenge|var challenge|\["security:status/challenge"\]) = "([a-f0-9]+)"#) {
+    if ($c =~ m#(?:g_challenge|"challenge"|var challenge|\["security:status/challenge"\])(?: =|:) "([a-f0-9]+)"#) {
         my $challenge = $1;
         my $pass = ($c =~ m#Benutzername#) ? $remote_pass : $local_admin_pass;
         my %data = (
@@ -78,13 +82,14 @@ if ($r->is_success) {
             response => sprintf "%s-%s", $challenge, md5_hex(encode("UTF16-LE", sprintf "%s-%s", $challenge, $pass))
         );
         my $vers = 0;
-        $r = $ua->post($url_login, \%data);
+        my $target = ($c =~ m#action="$url_login_suffix"#) ? $url_login : $url_base;
+        $r = $ua->post($target, \%data);
         $c = $r->decoded_content;
-        if ($c =~ m#FRITZ!OS (\d+)\.(\d+)#) {
-            $vers = $1.$2;
+        if ($c =~ m#(?:FRITZ!OS |version%3D\d\d\.)(\d+)\.(\d+)#) {
+            $vers = sprintf "%d", $1.$2;
         }
         err_exit "login failed" if ($c =~ m#(?:error_text|ErrorMsg)#i);
-        if ($c =~ m#(?:home|logout)\.lua\?sid=([a-f0-9]+)#) {
+        if ($c =~ m#(?:(?:home|logout)\.lua\?sid=|"sid": ")([a-f0-9]+)#) {
             my $sid = $1;
             if ($vers < 630) {
                 %data = (sid => $sid, "wakeup:settings/mac" => $mac);
@@ -94,20 +99,54 @@ if ($r->is_success) {
                 } else {
                     err_exit "invalid post data" . $r->status_line;
                 }
-            } else {
+            } elsif ($vers < 650) {
                 $r = $ua->get($url_netdevs.$sid);
                 $c = $r->decoded_content;
                 if ($c =~ m#$mac.*? value="([^"]+)"#i) {
-                    my $dev = $1;
-                    %data = (dev => $dev, btn_wake => "");
+                    my $uid = $1;
+                    %data = (dev => $uid, btn_wake => "");
                     $r = $ua->post($url_wakeup.$sid, \%data);
                     if ($r->is_success) {
                         print "[success] wakeup done\n";
                     } else {
-                        err_exit "invalid post data" . $r->status_line;
+                        err_exit "invalid post data: " . $r->status_line;
                     }
                 } else {
                     err_exit "could not find mac";
+                }
+            } else {
+                %data = (
+                    sid => $sid,
+                    page => "netDev"
+                );
+                $r = $ua->post($url_data, \%data);
+                $c = $r->decoded_content;
+                my $json = from_json($c);
+                my $uid = "";
+                my @devs = @{$json->{'data'}->{'passive'}};
+                push @devs, @{$json->{'data'}->{'active'}};
+                foreach my $dev (@devs) {
+                    if ($dev->{'mac'} eq $mac) {
+                        $uid = $dev->{'UID'};
+                        last;
+                    }
+                }
+                if ($uid ne "") {
+                    %data = (
+                        sid => $sid,
+                        dev => $uid,
+                        oldpage => $url_editdev_suffix,
+                        btn_wake => ""
+                    );
+                    $r = $ua->post($url_data, \%data);
+                    $c = $r->decoded_content;
+                    if ($c =~ m#"pid": "netDev"#) {
+                        print "[success] wakeup done\n";
+                    } else {
+                        err_exit "invalid post data: " . $r->status_line;
+                    }
+                } else {
+                    err_exit "could not find mac"
                 }
             }
         } else {
