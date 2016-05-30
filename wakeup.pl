@@ -85,7 +85,7 @@ if ($r->is_success) {
         my $target = ($c =~ m#action="$url_login_suffix"#) ? $url_login : $url_base;
         $r = $ua->post($target, \%data);
         $c = $r->decoded_content;
-        if ($c =~ m#(?:FRITZ!OS |version%3D\d\d\.)(\d+)\.(\d+)#) {
+        if ($c =~ m#(?:FRITZ!OS |version%3D\d+\.)(\d+)\.(\d+)#) {
             $vers = sprintf "%d", $1.$2;
         }
         err_exit "login failed" if ($c =~ m#(?:error_text|ErrorMsg)#i);
@@ -114,7 +114,7 @@ if ($r->is_success) {
                 } else {
                     err_exit "could not find mac";
                 }
-            } else {
+            } elsif ($vers >= 650) {
                 %data = (
                     sid => $sid,
                     page => "netDev"
@@ -146,8 +146,10 @@ if ($r->is_success) {
                         err_exit "invalid post data: " . $r->status_line;
                     }
                 } else {
-                    err_exit "could not find mac"
+                    err_exit "could not find mac";
                 }
+            } else {
+                err_exit "could not identify fritz!os version";
             }
         } else {
             err_exit "could not find a session id";
