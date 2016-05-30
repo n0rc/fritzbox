@@ -85,7 +85,7 @@ if ($r->is_success) {
         my $target = ($c =~ m#action="$url_login_suffix"#) ? $url_login : $url_base;
         $r = $ua->post($target, \%data);
         $c = $r->decoded_content;
-        if ($c =~ m#(?:FRITZ!OS |version%3D\d\d\.)(\d+)\.(\d+)#) {
+        if ($c =~ m#(?:FRITZ!OS |version%3D\d*\.)(\d+)\.(\d+)#) {
             $vers = sprintf "%d", $1.$2;
         }
         err_exit "login failed" if ($c =~ m#(?:error_text|ErrorMsg)#i);
