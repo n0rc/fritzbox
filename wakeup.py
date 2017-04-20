@@ -69,6 +69,9 @@ def get_uid(sid):
         for dev in devs['data']['passive']:
             if dev['mac'] == MAC:
                 return dev['UID']
+        for dev in devs['data']['active']:
+            if dev['mac'] == MAC:
+                return dev['UID']
         return ''
     except SSLError:
         ssl_error_exit()
@@ -92,7 +95,8 @@ if __name__ == '__main__':
         error_exit("authentication failed")
     else:
         uid = get_uid(sid)
-        if uid and wake_up(sid, uid):
-            print "[success] wakeup done"
+        if uid:
+            wake_up(sid, uid)
+            print "[success] wakeup sent"
         else:
-            error_exit("wrong mac or already woken up")
+            error_exit("unknown mac")
