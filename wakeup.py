@@ -97,6 +97,6 @@ if __name__ == '__main__':
         uid = get_uid(sid)
         if uid:
             wake_up(sid, uid)
-            print "[success] wakeup sent"
+            print "[success] wakeup sent to {}".format(MAC)
         else:
-            error_exit("unknown mac")
+            error_exit("unknown mac {}".format(MAC))
