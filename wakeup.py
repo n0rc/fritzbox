@@ -3,9 +3,11 @@
 #
 # (c)2017 n0rc
 
+import argparse
 import requests
 import hashlib
 import json
+import os
 import sys
 
 from lxml import etree
@@ -14,29 +16,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-### start of config section
-
-# external fritzbox hostname or ip
-HOST = 'my.hostname.or.ip'
-
-# ssl port
-PORT = 443
-
-# fritzbox login credentials
-USERNAME = 'myuser'
-PASSWORD = 'mypassword'
-
-# mac to wake up
-MAC = '00:C0:1D:C0:FF:EE'
-
-# verify ssl certificates
-VERIFY_SSL = True
-
-### end of config section
-
 SID_NOAUTH = '0000000000000000'
-URL_LOGIN = 'https://{}:{}/login_sid.lua'.format(HOST, PORT)
-URL_DATA = 'https://{}:{}/data.lua'.format(HOST, PORT)
 
 
 def error_exit(msg):
@@ -48,39 +28,50 @@ def ssl_error_exit():
     error_exit("ssl certificate verification failed")
 
 
-def get_sid():
+def get_config(config_file):
+    if os.path.isfile(config_file):
+        with open(config_file, 'r') as jf:
+            config = json.load(jf)
+        config['url_login'] = 'https://{}:{}/login_sid.lua'.format(config['host'], config['port'])
+        config['url_data'] = 'https://{}:{}/data.lua'.format(config['host'], config['port'])
+        return config
+    else:
+        error_exit("config file not found")
+
+
+def get_sid(config):
     try:
-        r = requests.get(URL_LOGIN, verify=VERIFY_SSL)
+        r = requests.get(config['url_login'], verify=config['verify_ssl'])
         t = etree.XML(r.content)
         challenge = t.xpath('//Challenge/text()')[0]
-        response = '{}-{}'.format(challenge, hashlib.md5('{}-{}'.format(challenge, PASSWORD).encode('utf-16-le')).hexdigest())
-        r = requests.get('{}?username={}&response={}'.format(URL_LOGIN, USERNAME, response), verify=VERIFY_SSL)
+        response = '{}-{}'.format(challenge, hashlib.md5('{}-{}'.format(challenge, config['password']).encode('utf-16-le')).hexdigest())
+        r = requests.get('{}?username={}&response={}'.format(config['url_login'], config['username'], response), verify=config['verify_ssl'])
         t = etree.XML(r.content)
         return t.xpath('//SID/text()')[0]
     except SSLError:
         ssl_error_exit()
 
 
-def get_uid(sid):
+def get_uid(config, sid, mac):
     try:
         payload = {'sid': sid, 'page': 'netDev'}
-        r = requests.post(URL_DATA, data=payload, verify=VERIFY_SSL)
+        r = requests.post(config['url_data'], data=payload, verify=config['verify_ssl'])
         devs = json.loads(r.content)
         for dev in devs['data']['passive']:
-            if dev['mac'] == MAC:
+            if dev['mac'] == mac:
                 return dev['UID']
         for dev in devs['data']['active']:
-            if dev['mac'] == MAC:
+            if dev['mac'] == mac:
                 return dev['UID']
         return ''
     except SSLError:
         ssl_error_exit()
 
 
-def wake_up(sid, uid):
+def wake_up(config, sid, uid):
     try:
         payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'btn_wake': ''}
-        r = requests.post(URL_DATA, data=payload, verify=VERIFY_SSL)
+        r = requests.post(config['url_data'], data=payload, verify=config['verify_ssl'])
         if '"pid":"netDev"' in r.content:
             return True
         else:
@@ -90,15 +81,25 @@ def wake_up(sid, uid):
 
 
 if __name__ == '__main__':
-    sid = get_sid()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('device', help='device name (from config file) to sent wakeup to', default='default', nargs='?')
+    parser.add_argument('--config', '-c', default='wakeup.json', metavar='wakeup.json', help='use specified config file')
+    parser.add_argument('--ssl-no-verify', '-k', action='store_true', help='ignore ssl certificate verification')
+    args, _ = parser.parse_known_args()
+
+    config = get_config(args.config)
+    config['verify_ssl'] = not args.ssl_no_verify
+    target_mac = config['devices'][args.device]
+
+    sid = get_sid(config)
     if sid == SID_NOAUTH:
         error_exit("authentication failed")
     else:
-        uid = get_uid(sid)
+        uid = get_uid(config, sid, target_mac)
         if uid:
-            if wake_up(sid, uid):
-                print "[success] wakeup sent to {}".format(MAC)
+            if wake_up(config, sid, uid):
+                print "[success] wakeup sent to {}".format(target_mac)
             else:
-                error_exit("wakeup mac {}".format(MAC))
+                error_exit("something went wrong while sending wakeup to {}".format(target_mac))
         else:
-            error_exit("unknown mac {}".format(MAC))
+            error_exit("unknown mac {}".format(target_mac))
