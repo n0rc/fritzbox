@@ -81,7 +81,7 @@ def wake_up(sid, uid):
     try:
         payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'btn_wake': ''}
         r = requests.post(URL_DATA, data=payload, verify=VERIFY_SSL)
-        if '"pid": "netDev"' in r.content:
+        if '"pid":"netDev"' in r.content:
             return True
         else:
             return False
@@ -96,7 +96,9 @@ if __name__ == '__main__':
     else:
         uid = get_uid(sid)
         if uid:
-            wake_up(sid, uid)
-            print "[success] wakeup sent to {}".format(MAC)
+            if wake_up(sid, uid):
+                print "[success] wakeup sent to {}".format(MAC)
+            else:
+                error_exit("wakeup mac {}".format(MAC))
         else:
             error_exit("unknown mac {}".format(MAC))
