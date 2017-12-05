@@ -89,7 +89,11 @@ if __name__ == '__main__':
 
     config = get_config(args.config)
     config['verify_ssl'] = not args.ssl_no_verify
-    target_mac = config['devices'][args.device]
+
+    if args.device in config['devices']:
+        target_mac = config['devices'][args.device]
+    else:
+        error_exit("unknown device {}".format(args.device))
 
     sid = get_sid(config)
     if sid == SID_NOAUTH:
