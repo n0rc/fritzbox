@@ -20,7 +20,7 @@ SID_NOAUTH = '0000000000000000'
 
 
 def error_exit(msg):
-    print "[error] {}".format(msg)
+    print("[error] {}".format(msg))
     sys.exit(1)
 
 
@@ -72,7 +72,7 @@ def wake_up(config, sid, uid):
     try:
         payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'btn_wake': ''}
         r = requests.post(config['url_data'], data=payload, verify=config['verify_ssl'])
-        if '"pid":"netDev"' in r.content:
+        if '"pid":"netDev"' in r.text:
             return True
         else:
             return False
@@ -102,7 +102,7 @@ if __name__ == '__main__':
         uid = get_uid(config, sid, target_mac)
         if uid:
             if wake_up(config, sid, uid):
-                print "[success] wakeup sent to {}".format(target_mac)
+                print("[success] wakeup sent to {}".format(target_mac))
             else:
                 error_exit("something went wrong while sending wakeup to {}".format(target_mac))
         else:
