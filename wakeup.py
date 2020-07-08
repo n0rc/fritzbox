@@ -70,9 +70,17 @@ def get_uid(config, sid, mac):
 
 def wake_up(config, sid, uid):
     try:
-        payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'btn_wake': ''}
+        payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'page': 'edit_device2', 'btn_wake': ''}
         r = requests.post(config['url_data'], data=payload, verify=config['verify_ssl'])
-        if '"pid":"netDev"' in r.text:
+        if r.headers.get("content-type").startswith('application/json'):
+            reply = json.loads(r.content)
+            try:
+                if reply['data']['btn_wake'] == 'ok':
+                    return True
+            except KeyError:
+                pass
+            return False
+        elif '"pid":"netDev"' in r.text:
             return True
         else:
             return False
