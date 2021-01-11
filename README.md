@@ -20,6 +20,8 @@ All configuration is done in the config file in JSON format:
 * *username*/*password*: fritzbox login credentials
 * *devices*: list of device names with macs that can be used for wakeup
 
+If the password line is not present in the config file, you will be prompted for the password.
+
 #### Usage
 
 ```sh

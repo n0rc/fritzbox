@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import sys
+import getpass
 
 from lxml import etree
 from requests.exceptions import SSLError
@@ -41,10 +42,14 @@ def get_config(config_file):
 
 def get_sid(config):
     try:
+        password = config['password']
+    except:
+        password = getpass.getpass()
+    try:
         r = requests.get(config['url_login'], verify=config['verify_ssl'])
         t = etree.XML(r.content)
         challenge = t.xpath('//Challenge/text()')[0]
-        response = '{}-{}'.format(challenge, hashlib.md5('{}-{}'.format(challenge, config['password']).encode('utf-16-le')).hexdigest())
+        response = '{}-{}'.format(challenge, hashlib.md5('{}-{}'.format(challenge, password).encode('utf-16-le')).hexdigest())
         r = requests.get('{}?username={}&response={}'.format(config['url_login'], config['username'], response), verify=config['verify_ssl'])
         t = etree.XML(r.content)
         return t.xpath('//SID/text()')[0]
