@@ -88,7 +88,7 @@ def wake_up(config, sid, uid):
         if version > 7.25:
             payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'page': 'edit_device', 'btn_wake': ''}
         else:
-            payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'page': 'edit_device', 'btn_wake': ''}
+            payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'page': 'edit_device2', 'btn_wake': ''}
         r = requests.post(config['url_data'], data=payload, verify=config['verify_ssl'])
         if r.headers.get("content-type").startswith('application/json'):
             reply = json.loads(r.content)
