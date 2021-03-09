@@ -91,7 +91,7 @@ def wake_up(config, sid, uid):
         payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'page': 'edit_device', 'btn_wake': ''}
         vers = get_version(config, sid)
         if version.parse(vers) < version.parse('7.25'):
-           payload['page'] += '2'
+            payload['page'] += '2'
         r = requests.post(config['url_data'], data=payload, verify=config['verify_ssl'])
         if r.headers.get("content-type").startswith('application/json'):
             reply = json.loads(r.content)
