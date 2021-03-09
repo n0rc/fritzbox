@@ -9,6 +9,7 @@ Currently only Fritzboxes with FRITZ!OS v6.50 or newer are supported.
 #### Required Python modules
 
 * lxml
+* packaging
 * requests
 
 #### Configuration
