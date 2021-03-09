@@ -72,10 +72,23 @@ def get_uid(config, sid, mac):
     except SSLError:
         ssl_error_exit()
 
+def get_version(config, sid):
+    try:
+        payload = {'sid': sid, 'page': 'overview'}
+        r = requests.post(config['url_data'], data=payload, verify=config['verify_ssl'])
+        jsonresponse = json.loads(r.content)
+        fritzos = json.loads(json.dumps(jsonresponse['data']['fritzos']))
+        return fritzos['nspver']
+    except SSLError:
+        ssl_error_exit()
 
 def wake_up(config, sid, uid):
     try:
-        payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'page': 'edit_device2', 'btn_wake': ''}
+        version = get_version(config, sid)
+        if version > 7.25:
+            payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'page': 'edit_device', 'btn_wake': ''}
+        else:
+            payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'page': 'edit_device2', 'btn_wake': ''}
         r = requests.post(config['url_data'], data=payload, verify=config['verify_ssl'])
         if r.headers.get("content-type").startswith('application/json'):
             reply = json.loads(r.content)
