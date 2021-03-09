@@ -1,17 +1,18 @@
 #!/usr/bin/env python
 # coding: utf-8
 #
-# (c)2017 n0rc
+# (c)2017-2021 n0rc
 
 import argparse
-import requests
+import getpass
 import hashlib
 import json
 import os
+import requests
 import sys
-import getpass
 
 from lxml import etree
+from packaging import version
 from requests.exceptions import SSLError
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
@@ -72,23 +73,25 @@ def get_uid(config, sid, mac):
     except SSLError:
         ssl_error_exit()
 
+
 def get_version(config, sid):
     try:
         payload = {'sid': sid, 'page': 'overview'}
         r = requests.post(config['url_data'], data=payload, verify=config['verify_ssl'])
-        jsonresponse = json.loads(r.content)
-        fritzos = json.loads(json.dumps(jsonresponse['data']['fritzos']))
-        return fritzos['nspver']
+        reply = json.loads(r.content)
+        return reply['data']['fritzos']['nspver']
     except SSLError:
         ssl_error_exit()
+    except KeyError:
+        return '0.0'
+
 
 def wake_up(config, sid, uid):
     try:
-        version = get_version(config, sid)
-        if version > 7.25:
-            payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'page': 'edit_device', 'btn_wake': ''}
-        else:
-            payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'page': 'edit_device2', 'btn_wake': ''}
+        payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'page': 'edit_device', 'btn_wake': ''}
+        vers = get_version(config, sid)
+        if version.parse(vers) < version.parse('7.25'):
+           payload['page'] += '2'
         r = requests.post(config['url_data'], data=payload, verify=config['verify_ssl'])
         if r.headers.get("content-type").startswith('application/json'):
             reply = json.loads(r.content)
