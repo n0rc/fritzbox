@@ -60,7 +60,7 @@ def get_sid(config):
 
 def get_uid(config, sid, mac):
     try:
-        payload = {'sid': sid, 'page': 'netDev'}
+        payload = {'sid': sid, 'page': 'netDev', 'xhrId': 'all'}
         r = requests.post(config['url_data'], data=payload, verify=config['verify_ssl'])
         devs = json.loads(r.content)
         for dev in devs['data']['passive']:
@@ -79,7 +79,7 @@ def get_version(config, sid):
         payload = {'sid': sid, 'page': 'overview'}
         r = requests.post(config['url_data'], data=payload, verify=config['verify_ssl'])
         reply = json.loads(r.content)
-        return reply['data']['fritzos']['nspver']
+        return reply['data']['fritzos']['nspver'].split().pop(0)
     except SSLError:
         ssl_error_exit()
     except KeyError:
@@ -90,7 +90,7 @@ def wake_up(config, sid, uid):
     try:
         payload = {'sid': sid, 'dev': uid, 'oldpage': 'net/edit_device.lua', 'page': 'edit_device', 'btn_wake': ''}
         vers = get_version(config, sid)
-        if version.parse(vers) < version.parse('7.25'):
+        if version.parse(vers) <= version.parse('7.24'):
             payload['page'] += '2'
         r = requests.post(config['url_data'], data=payload, verify=config['verify_ssl'])
         if r.headers.get("content-type").startswith('application/json'):
